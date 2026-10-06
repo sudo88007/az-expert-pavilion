@@ -70,7 +70,7 @@ function viewPhaseA(A) {
      <select id="pa-style" style="width:auto"><option value="sat">View: Satellite</option><option value="bp">View: Blueprint</option></select><input type="file" id="pa-bg" accept="image/*,.pdf" hidden>
      ${state.phaseImg ? '<button class="btn" id="pa-nobg">Remove background</button>' : ''}
      <button class="btn" id="pa-zin">＋</button><button class="btn" id="pa-zout">－</button><button class="btn" id="pa-zreset">Reset view</button>
-     <button class="btn ${paAdmin ? 'primary' : ''}" id="pa-admin">${paAdmin ? '🔓 Admin mode ON' : '🔒 Admin login'}</button>
+     <button class="btn ${paAdmin ? 'primary' : ''}" id="pa-admin">${paAdmin ? '🔓 Edit mode (' + (window.AUTH && AUTH.user ? AUTH.user.role : '') + ')' : '👁 View only'}</button>
      <button class="btn" id="pa-xlsx">⬇ Villas to Excel</button>
    </div>
    <div class="mp-layout">
@@ -107,11 +107,7 @@ function viewPhaseA(A) {
       tip.classList.remove('hidden'); tip.style.left = Math.min(e.clientX - r.left + 14, r.width - 220) + 'px'; tip.style.top = (e.clientY - r.top + 14) + 'px'; };
     g.onmouseleave = () => tip.classList.add('hidden');
   });
-  $('#pa-admin').onclick = () => {
-    if (paAdmin) { paAdmin = false; return render(); }
-    const pw = localStorage.getItem('buildsight.pw') || 'admin123', v = prompt('Admin password (default: admin123)');
-    if (v === pw) { paAdmin = true; toast('Admin mode: click a villa to edit'); render(); } else if (v !== null) toast('Wrong password');
-  };
+  $('#pa-admin').onclick = () => toast(paAdmin ? 'You can edit villas: click a villa on the map' : 'Your account is view-only. Ask an administrator for editor access.');
   $('#pa-xlsx').onclick = () => {
     const rows = PA_VILLAS.map(v => { const i = infos[v.id], m = i.m; return { Villa: v.id, Owner: m.owner || '', Type: m.type || '', Contractor: m.contractor || '', Budget: i.budget ?? '', Actual: i.actual ?? '', 'Progress %': has(i.progress) ? Math.round(i.progress) : '', Status: i.status, Start: m.start || '', End: m.end || '', Issues: i.issues.join('; '), Notes: m.notes || '' }; });
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Phase A Villas'); XLSX.writeFile(wb, 'PhaseA-Villas.xlsx');
@@ -120,7 +116,7 @@ function viewPhaseA(A) {
 }
 
 function paDetail(infos, ex) {
-  const box = $('#pa-detail'); if (!paSel) return box.innerHTML = `<h2>Phase A</h2><p class="muted">Click any villa on the map.${paAdmin ? '' : '<br><br>Log in as admin to enter or change villa data.'}</p>`;
+  const box = $('#pa-detail'); if (!paSel) return box.innerHTML = `<h2>Phase A</h2><p class="muted">Click any villa on the map.${paAdmin ? '' : '<br><br>You have view-only access. Editors and administrators can change villa data.'}</p>`;
   const i = infos[paSel], m = i.m, e = i.e, f = k => esc(m[k] ?? '');
   const statusChip = `<span class="chip" style="border-color:${PA_COL[i.status]}">${i.status}</span>`;
   const excelBlock = e ? `<h2 style="margin-top:16px">From Excel (${e.rows} rows · ${[...e.files].map(esc).join(', ')})</h2>
@@ -139,7 +135,7 @@ function paDetail(infos, ex) {
     return;
   }
   const inp = (k, label, type = 'text') => `<div><div class="muted small">${label}</div><input type="${type}" id="f-${k}" value="${f(k)}"></div>`;
-  box.innerHTML = `<h2>Edit Villa ${paSel} ${statusChip}</h2>
+  box.innerHTML = `<h2>Edit Villa ${paSel} ${statusChip}</h2>${apPendingFor(paSel)}
    <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin:10px 0">
      ${inp('owner', 'Owner / client')}${inp('type', 'Villa type')}${inp('contractor', 'Contractor')}
      <div><div class="muted small">Status</div><select id="f-status"><option value="">Auto</option>${PA_STATUS.map(s => `<option ${m.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
@@ -148,14 +144,13 @@ function paDetail(infos, ex) {
    <div class="muted small">Notes</div><textarea id="f-notes" rows="3">${f('notes')}</textarea>
    <p class="small muted">Empty fields use Excel values when available.</p>
    <div class="row" style="margin-top:10px"><button class="btn primary" id="pa-save">Save</button><button class="btn danger" id="pa-clear">Clear manual data</button><button class="btn" id="pa-next">Next villa ›</button></div>
-   <div class="row"><button class="btn ghost" id="pa-pw">Change password</button><button class="btn ghost" id="pa-bk">Backup (JSON)</button><label class="btn ghost" for="pa-rs">Restore</label><input type="file" id="pa-rs" accept=".json" hidden></div>
+   <div class="row"><button class="btn ghost" id="pa-bk">Backup (JSON)</button><label class="btn ghost" for="pa-rs">Restore</label><input type="file" id="pa-rs" accept=".json" hidden></div>
    ${issues}${excelBlock}`;
-  $('#pa-save').onclick = () => { state.villas ??= {}; const o = {}; ['owner', 'type', 'contractor', 'status', 'budget', 'actual', 'progress', 'start', 'end', 'notes'].forEach(k => { const v = $('#f-' + k).value; if (v !== '') o[k] = v; }); state.villas[paSel] = o; save(); toast(`Villa ${paSel} saved`); render(); };
-  $('#pa-clear').onclick = () => { if (state.villas) delete state.villas[paSel]; save(); render(); };
+  $('#pa-save').onclick = () => { state.villas ??= {}; const o = {}; ['owner', 'type', 'contractor', 'status', 'budget', 'actual', 'progress', 'start', 'end', 'notes'].forEach(k => { const v = $('#f-' + k).value; if (v !== '') o[k] = v; }); submitVillaChange(paSel, o); render(); };
+  $('#pa-clear').onclick = () => { submitVillaChange(paSel, null); render(); };
   $('#pa-next').onclick = () => { const k = PA_VILLAS.findIndex(v => v.id === paSel); paSel = PA_VILLAS[(k + 1) % PA_VILLAS.length].id; render(); };
-  $('#pa-pw').onclick = () => { const p = prompt('New admin password'); if (p) { localStorage.setItem('buildsight.pw', p); toast('Password changed'); } };
   $('#pa-bk').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(state.villas || {}, null, 1)], { type: 'application/json' })); a.download = 'phaseA-villas-backup.json'; a.click(); };
-  $('#pa-rs').onchange = async e => { try { state.villas = JSON.parse(await e.target.files[0].text()); save(); render(); toast('Restored'); } catch { toast('Invalid backup file'); } };
+  $('#pa-rs').onchange = async e => { if (!AUTH.isAdmin()) return toast('Only administrators can restore backups'); try { state.villas = JSON.parse(await e.target.files[0].text()); save(); render(); toast('Restored'); } catch { toast('Invalid backup file'); } };
 }
 
 /* Stylised drawn plan (used when no background image is loaded): boundary, ring roads, legend */

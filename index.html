@@ -23,10 +23,13 @@
     <button class="nav-btn" data-view="risks" id="nav-risks">⚠️ Risks &amp; Alerts</button>
     <button class="nav-btn" data-view="docs" id="nav-docs">📄 PDF Documents</button>
     <button class="nav-btn" data-view="ai" id="nav-ai">🤖 Ask AI</button>
+    <button class="nav-btn needs-edit" data-view="approvals" id="nav-approvals">✅ Approvals <span id="ap-badge" class="badge" style="display:none"></span></button>
+    <button class="nav-btn needs-admin" data-view="users" id="nav-users">👥 Users</button>
   </nav>
   <div class="side-foot">
-    <button class="btn ghost" id="btn-demo">Load demo data</button>
-    <button class="btn ghost danger" id="btn-clear">Clear all data</button>
+    <div id="auth-chip" class="auth-chip"></div>
+    <button class="btn ghost needs-edit" id="btn-demo">Load demo data</button>
+    <button class="btn ghost danger needs-admin" id="btn-clear">Clear all data</button>
     <p class="muted small">🔒 Files are processed in your browser. Nothing is uploaded.</p>
   </div>
 </aside>
@@ -39,12 +42,12 @@
     </div>
     <div class="top-actions">
       <button class="btn" id="btn-export">⬇ Export report</button>
-      <label class="btn primary" for="file-input">＋ Upload files</label>
+      <label class="btn primary needs-edit" for="file-input">＋ Upload files</label>
       <input type="file" id="file-input" multiple accept=".xlsx,.xls,.csv,.pdf" hidden>
     </div>
   </header>
 
-  <div id="dropzone" class="dropzone">
+  <div id="dropzone" class="dropzone needs-edit">
     <div class="dz-icon">⇪</div>
     <strong>Drop Excel / CSV / PDF files here</strong>
     <span class="muted">Re-uploading a file with the same name automatically updates its data</span>
@@ -57,11 +60,18 @@
   <section id="view-risks" class="view hidden"></section>
   <section id="view-docs" class="view hidden"></section>
   <section id="view-ai" class="view hidden"></section>
+  <section id="view-approvals" class="view hidden"></section>
+  <section id="view-users" class="view hidden"></section>
 </main>
 <div id="toast" class="toast"></div>
+<div id="auth-overlay" class="auth-overlay"></div>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="approvals.js"></script>
 <script src="phasea.js"></script>
 <script src="plan.js"></script>
 <script src="app.js"></script>
 <script src="ai.js"></script>
+<script src="smart.js"></script>
 </body>
 </html>

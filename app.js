@@ -8,6 +8,7 @@ let charts = [];
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch (e) { toast('Data too large to save locally – it will be lost on refresh'); }
+  if (window.AUTH) AUTH.push();
 }
 function load() { try { state = JSON.parse(localStorage.getItem(KEY)) || { files: {} }; } catch { state = { files: {} }; } }
 
@@ -78,6 +79,7 @@ function parseSheet(ws, name) {
 async function ingest(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const replaced = !!state.files[file.name];
+  let applied = true;
   try {
     if (ext === 'pdf') {
       const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -86,17 +88,17 @@ async function ingest(file) {
         const c = await (await pdf.getPage(i)).getTextContent();
         pages.push(c.items.map(x => x.str).join(' '));
       }
-      state.files[file.name] = { type: 'pdf', pages, added: Date.now() };
+      applied = stageFile(file.name, { type: 'pdf', pages, added: Date.now() });
     } else {
       const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
       const sheets = wb.SheetNames.map(n => parseSheet(wb.Sheets[n], n)).filter(Boolean);
       if (!sheets.length) return toast(`No table found in ${file.name}`);
-      state.files[file.name] = { type: 'excel', sheets, added: Date.now() };
+      applied = stageFile(file.name, { type: 'excel', sheets, added: Date.now() });
     }
-    toast(replaced ? `Updated ${file.name}` : `Added ${file.name}`);
+    if (applied) toast(replaced ? `Updated ${file.name}` : `Added ${file.name}`);
   } catch (e) { console.error(e); toast(`Could not read ${file.name}`); }
 }
-async function handleFiles(list) { for (const f of list) await ingest(f); save(); render(); }
+async function handleFiles(list) { if (window.AUTH && !AUTH.canEdit()) return toast('Your account is view-only'); for (const f of list) await ingest(f); save(); render(); }
 
 /* ---------- analysis ---------- */
 const sheetsAll = () => Object.entries(state.files).filter(([, f]) => f.type === 'excel')
@@ -374,7 +376,7 @@ function loadDemo() {
 }
 
 /* ---------- router / render ---------- */
-const titles = { phasea: ['Phase A Masterplan', 'Click a villa – admins can edit, Excel data updates automatically'], dashboard: ['Project Dashboard', 'Live overview of cost, progress and risk'], masterplan: ['Masterplan Map', 'Every pavilion on the site, colored by status'], sections: ['Sections', 'Every sheet detected from your files'], risks: ['Risks & Alerts', 'Automatically detected problems'], docs: ['PDF Documents', 'Search contracts and reports'], ai: ['Ask AI', 'Chat with your project data'] };
+const titles = { approvals: ['Approvals', 'Review, approve or reject changes before they go live'], users: ['User Management', 'Create accounts and control who can view or edit'], phasea: ['Phase A Masterplan', 'Click a villa – admins can edit, Excel data updates automatically'], dashboard: ['Project Dashboard', 'Live overview of cost, progress and risk'], masterplan: ['Masterplan Map', 'Every pavilion on the site, colored by status'], sections: ['Sections', 'Every sheet detected from your files'], risks: ['Risks & Alerts', 'Automatically detected problems'], docs: ['PDF Documents', 'Search contracts and reports'], ai: ['Ask AI', 'Chat with your project data'] };
 let current = 'phasea';
 function render() {
   charts.forEach(c => c.destroy()); charts = [];
@@ -383,7 +385,7 @@ function render() {
   $('#page-title').textContent = titles[current][0];
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   $('#view-' + current).classList.remove('hidden');
-  ({ phasea: viewPhaseA, dashboard: viewDashboard, masterplan: viewMasterplan, sections: viewSections, risks: viewRisks, docs: viewDocs, ai: viewAI })[current](A);
+  ({ approvals: viewApprovals, users: viewUsers, phasea: viewPhaseA, dashboard: viewDashboard, masterplan: viewMasterplan, sections: viewSections, risks: viewRisks, docs: viewDocs, ai: viewAI })[current](A);
 }
 document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => {
   document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); current = b.dataset.view; render();
